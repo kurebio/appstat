@@ -264,7 +264,7 @@ int main(int argc, char *const argv[]) {
         }
         if (fflag) {
             for (NSNumber *genre in categories) {
-                scanTopApps(appid, genre.intValue, YES, listsize);
+                scanTopApps(appid, genre.intValue, NO, listsize);
                 printf("\n");
             }
             [operationQueue waitUntilAllOperationsAreFinished];
