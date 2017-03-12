@@ -29,7 +29,7 @@ static NSString *genreName(int genre) {
         case 6021: return @"newsstand";
         case 6022: return @"catalogs";
         case 6023: return @"food & drink";
-        
+
         // Games
         case 7001: return @"action games";
         case 7002: return @"adventure games";
@@ -50,7 +50,7 @@ static NSString *genreName(int genre) {
         case 7017: return @"strategy games";
         case 7018: return @"trivia games";
         case 7019: return @"word games";
-            
+
         // Newsstand
         case 13001: return @"newsstand - news & politics";
         case 13002: return @"newsstand - fashion & style";
@@ -121,8 +121,8 @@ static void print_usage(void) {
     printf("\t-f : search top free\n");
     printf("\t-p : search top paid\n");
     printf("\t-l <list_size> : 1-200 (-p or -f required)\n");
-    
-    
+
+
     printf("\nexample:\n\tappstat -s Omnistat -p -g 6002,6007\n");
     printf("\tappstat -a 898245825 -r\n");
 	exit(0);
@@ -148,26 +148,26 @@ static void print_genres(void) {
 
 static id JSONObjectFromURL(NSURL *url, NSError *error);
 static NSArray* getEntries(id jsonObject);
-static void scanTopApps(NSString *appid, int genre, BOOL paid, int listsize);
+static void scanTopApps(NSString *appid, int genre, BOOL paid, int listsize, NSString *country);
 static void scanReviews(NSString *appid);
 static NSString* searchApp(NSString *query, NSString *country);
 
 int main(int argc, char *const argv[]) {
-    
+
     @autoreleasepool {
-        
+
         int listsize = 200; // list size
         int rflag,pflag,fflag= 0;      // show reviews
-        
+
         NSString *appid = nil;
         NSString *country = nil;
         NSString *searchQuery = nil;
         NSMutableArray *categories = [[NSMutableArray alloc] init];
         [categories addObject:@(6019)]; // all by default
-        
+
         int c;
         opterr = 0;
-        
+
         while ((c = getopt (argc, argv, ":a:c:g:s:l:rpfh")) != -1)
             switch (c)
         {
@@ -219,7 +219,7 @@ int main(int argc, char *const argv[]) {
                     fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
                 return 1;
         }
-        
+
         countries = @[@"AL", @"DZ", @"AO", @"AI", @"AG", @"AR", @"AM", @"AU", @"AT", @"AZ", @"BS", @"BH", @"BB", @"BY", @"BE", @"BZ", @"BJ", @"BM", @"BT", @"BO", @"BW", @"BR", @"VG", @"BN", @"BG", @"BF", @"KH", @"CA", @"CV", @"KY", @"TD", @"CL", @"CN", @"CO", @"CG", @"CR", @"HR", @"CY", @"CZ", @"DK", @"DM", @"DO", @"EC", @"EG", @"SV", @"EE", @"FJ", @"FI", @"FR", @"GM", @"DE", @"GH", @"GR", @"GD", @"GT", @"GW", @"GY", @"HN", @"HK", @"HU", @"IS", @"IN", @"ID", @"IE", @"IL", @"IT", @"JM", @"JP", @"JO", @"KZ", @"KE", @"KR", @"KW", @"KG", @"LA", @"LV", @"LB", @"LR", @"LT", @"LU", @"MO", @"MK", @"MG", @"MW", @"MY", @"ML", @"MT", @"MR", @"MU", @"MX", @"FM", @"MD", @"MN", @"MS", @"MZ", @"NA", @"NP", @"NL", @"NZ", @"NI", @"NE", @"NG", @"NO", @"OM", @"PK", @"PW", @"PA", @"PG", @"PY", @"PE", @"PH", @"PL", @"PT", @"QA", @"RO", @"RU", @"ST", @"SA", @"SN", @"SC", @"SL", @"SG", @"SK", @"SI", @"SB", @"ZA", @"ES", @"LK", @"KN", @"LC", @"VC", @"SR", @"SZ", @"SE", @"CH", @"TW", @"TJ", @"TZ", @"TH", @"TT", @"TN", @"TR", @"TM", @"TC", @"UG", @"GB", @"UA", @"AE", @"UY", @"US", @"UZ", @"VE", @"VN", @"YE", @"ZW"];
 
         country = country ?: @"US";
@@ -241,15 +241,15 @@ int main(int argc, char *const argv[]) {
                 exit(1);
             }
         }
-        
+
         operationQueue = [[NSOperationQueue alloc] init];
         operationQueue.name = @"Operation Queue";
         operationQueue.maxConcurrentOperationCount = 10;
-        
+
         if (rflag == 0 && pflag == 0 && fflag == 0) {
             fprintf(stderr, "use -f or -p or -r to search in top free/paid or list reviews\n");
         }
-        
+
         if (rflag) {
             scanReviews(appid);
             [operationQueue waitUntilAllOperationsAreFinished];
@@ -257,14 +257,14 @@ int main(int argc, char *const argv[]) {
         }
         if (pflag) {
             for (NSNumber *genre in categories) {
-                scanTopApps(appid, genre.intValue, YES, listsize);
+                scanTopApps(appid, genre.intValue, YES, listsize, country);
                 printf("\n");
             }
             [operationQueue waitUntilAllOperationsAreFinished];
         }
         if (fflag) {
             for (NSNumber *genre in categories) {
-                scanTopApps(appid, genre.intValue, NO, listsize);
+                scanTopApps(appid, genre.intValue, NO, listsize, country);
                 printf("\n");
             }
             [operationQueue waitUntilAllOperationsAreFinished];
@@ -284,7 +284,7 @@ static id JSONObjectFromURL(NSURL *url, NSError *error) {
         fprintf(stderr, "Unable to load data `%s'.\n", url.absoluteString.UTF8String);
         return nil;
     }
-    
+
     return [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
 }
 
@@ -297,52 +297,50 @@ static NSArray* getEntries(id jsonObject) {
     return nil;
 }
 
-static void scanTopApps(NSString *appid, int genre, BOOL paid, int listsize) {
+static void scanTopApps(NSString *appid, int genre, BOOL paid, int listsize, NSString *country) {
     NSString *genreStr = genreName(genre);
     printf("search for appID: \033[34m%s\033[m\nin %d top \033[32m%s%s\033[m\n", appid.UTF8String, listsize, paid ? "paid" : "free", genreStr != nil ? [NSString stringWithFormat:@" %s",genreStr.UTF8String].UTF8String : "");
-    
-    for (NSString *country in countries) {
-        
-        [operationQueue addOperationWithBlock:^{
-            printf("\r%s [%lu/%lu]", country.UTF8String, [countries indexOfObject:country]+1, [countries count]);
-            fflush(stdout);
-            
-            NSURL *url = topURL(paid,country,genre,listsize);
-            NSError* error = nil;
-            
-            NSDictionary *result = JSONObjectFromURL(url, error);
-            
-            if (!error && result) {
-                NSArray *entries = getEntries(result);
-                for (NSDictionary *entry in entries) {
-                    NSString *entryid = entry[@"id"][@"attributes"][@"im:id"];
-                    NSString *title = entry[@"im:name"][@"label"];
-                    if ([entryid isEqualToString:appid]) {
-                        printf("\r\033[34m%ld\033[m in \033[32m%s\033[m - %s\n", [result[@"feed"][@"entry"] indexOfObject:entry]+1, countryName(country).UTF8String, title.UTF8String);
-                    }
+
+
+    [operationQueue addOperationWithBlock:^{
+        printf("\r%s [%lu/%lu]", country.UTF8String, [countries indexOfObject:country]+1, [countries count]);
+        fflush(stdout);
+
+        NSURL *url = topURL(paid,country,genre,listsize);
+        NSError* error = nil;
+
+        NSDictionary *result = JSONObjectFromURL(url, error);
+
+        if (!error && result) {
+            NSArray *entries = getEntries(result);
+            for (NSDictionary *entry in entries) {
+                NSString *entryid = entry[@"id"][@"attributes"][@"im:id"];
+                NSString *title = entry[@"im:name"][@"label"];
+                if ([entryid isEqualToString:appid]) {
+                    printf("\r\033[34m%ld\033[m in \033[32m%s\033[m - %s\n", [result[@"feed"][@"entry"] indexOfObject:entry]+1, countryName(country).UTF8String, title.UTF8String);
                 }
-                
-            }else {
-                NSLog(@"ERROR: %@",error.debugDescription);
             }
-        }];
-    }
+
+        }else {
+            NSLog(@"ERROR: %@",error.debugDescription);
+        }
+    }];
 }
 
 static void scanReviews(NSString *appid) {
     printf("search reviews for appID: %s\n",appid.UTF8String);
-    
+
     for (NSString *country in countries) {
-        
+
         [operationQueue addOperationWithBlock:^{
             printf("\r%s [%lu/%lu]", country.UTF8String, [countries indexOfObject:country]+1, [countries count]);
             fflush(stdout);
-            
+
             NSURL *url = reviewsURL(country, appid);
             NSError* error = nil;
-            
+
             NSDictionary *result = JSONObjectFromURL(url, error);
-            
+
             if (!error && result) {
                 NSArray *entries = getEntries(result);
                 NSString *bundle = nil;
@@ -356,28 +354,28 @@ static void scanReviews(NSString *appid) {
                     NSString *title = entry[@"title"][@"label"];
                     NSString *content = entry[@"content"][@"label"];
                     NSString *version = entry[@"im:version"][@"label"];
-                    
+
                     int rating_int = [rating intValue];
                     NSString *stars = @"";
                     for (int i = 0; i<5; i++)
                         stars = [stars stringByAppendingString:(i<rating_int) ? @"★" : @" "];
-                    
+
                     printf("\r%s - %s - \033[33m%s\033[m - %s\n\033[34m%s\033[m - \033[32m%s\033[m\n%s\n", bundle.UTF8String, version.UTF8String, stars.UTF8String, countryName(country).UTF8String, author.UTF8String, title.UTF8String, content.UTF8String);
                 }
             }else {
                 NSLog(@"ERROR: %@",error.debugDescription);
             }
         }];
-        
+
     }
 }
 
 static NSString* searchApp(NSString *query, NSString *country) {
     NSURL *url = searchURL(country, query);
     NSError* error = nil;
-    
+
     NSDictionary *result = JSONObjectFromURL(url, error);
-    
+
     if (!error && result) {
         NSArray *entries = result[@"results"];
         if ([entries count] == 1) {
